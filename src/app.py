@@ -9,22 +9,24 @@ from src.preprocessing.pipeline import build_pipeline, save_pipeline
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
 class AcademicRiskApp:
     """
     Main application class for the Academic Risk Prediction System.
     Acts as the orchestrator for training, inference, and API serving.
     """
-    
+
     def __init__(self):
         self.app = Flask(__name__)
         self.setup_routes()
         self.pipeline = None
-        self.model = None # Placeholder for Phase 3
-        
+        self.model = None  # Placeholder for Phase 3
+
     def setup_routes(self):
         """
         Defines the Flask API endpoints.
         """
+
         @self.app.route('/health', methods=['GET'])
         def health():
             return jsonify({'status': 'ok', 'message': 'Academic Risk API is running'}), 200
@@ -51,7 +53,7 @@ class AcademicRiskApp:
         4. Saves pipeline artifact
         """
         logger.info(f"Starting preprocessing pipeline with data from: {data_path}")
-        
+
         if not os.path.exists(data_path):
             raise FileNotFoundError(f"Dataset not found at {data_path}")
 
@@ -62,7 +64,7 @@ class AcademicRiskApp:
 
             # Build Pipeline
             self.pipeline = build_pipeline()
-            
+
             # Execute Pipeline
             # Note: The cleaner step may reduce the number of rows
             X_transformed = self.pipeline.fit_transform(df)
@@ -71,7 +73,7 @@ class AcademicRiskApp:
             # Save Artifact
             save_pipeline(self.pipeline)
             logger.info("Pipeline artifact saved successfully.")
-            
+
             return X_transformed
 
         except Exception as e:
@@ -86,16 +88,7 @@ class AcademicRiskApp:
         logger.info(f"Starting API server on {host}:{port}")
         self.app.run(host=host, port=port)
 
+
 if __name__ == "__main__":
-    # If run directly, can be used for CLI-like execution of the pipeline
-    import sys
-    
     app = AcademicRiskApp()
-    
-    if len(sys.argv) > 1 and sys.argv[1] == 'run-pipeline':
-        # CLI Mode
-        dataset_path = sys.argv[2] if len(sys.argv) > 2 else 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv'
-        app.run_preprocessing_pipeline(dataset_path)
-    else:
-        # Server Mode
-        app.run_server()
+    app.run_server()

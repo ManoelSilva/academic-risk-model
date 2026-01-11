@@ -5,6 +5,7 @@
 
 docs/
 mlruns/
+models/
 
 ### Flask ###
 instance/*
