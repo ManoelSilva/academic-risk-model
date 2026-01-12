@@ -1,7 +1,6 @@
 import pandas as pd
-import numpy as np
-import re
 from sklearn.base import BaseEstimator, TransformerMixin
+from utils.data_utils import map_nivel_robust
 
 
 class DataCleaner(BaseEstimator, TransformerMixin):
@@ -24,7 +23,7 @@ class DataCleaner(BaseEstimator, TransformerMixin):
         print(f"Original shape: {df.shape}")
 
         # 1. Map NIVEL_IDEAL_2022 to numeric
-        df['NIVEL_IDEAL_2022_NUM'] = df['NIVEL_IDEAL_2022'].apply(self._map_nivel_robust)
+        df['NIVEL_IDEAL_2022_NUM'] = df['NIVEL_IDEAL_2022'].apply(map_nivel_robust)
 
         # 2. Ensure FASE_2022 is numeric
         df['FASE_2022'] = pd.to_numeric(df['FASE_2022'], errors='coerce')
@@ -48,16 +47,3 @@ class DataCleaner(BaseEstimator, TransformerMixin):
         print(f"Shape after dropping leakage columns: {df.shape}")
 
         return df
-
-    @staticmethod
-    def _map_nivel_robust(x):
-        x_str = str(x).upper()
-        if pd.isna(x) or x_str == 'NAN': return np.nan
-
-        if 'ALFA' in x_str: return 0
-
-        match = re.search(r'(?:NIVEL|FASE|NVEL|NVEL)\s*(\d+)', x_str)
-        if match:
-            return int(match.group(1))
-
-        return np.nan
