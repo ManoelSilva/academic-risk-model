@@ -7,9 +7,12 @@ import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+from sklearn.base import BaseEstimator, TransformerMixin
 
-from src.preprocessing.components import get_feature_lists
+from src.preprocessing.components import get_feature_lists, build_preprocessor
 from src.preprocessing.pipeline import build_pipeline, save_pipeline
+from src.preprocessing.cleaning import DataCleaner
+from src.features.engineering import FeatureEngineer
 
 
 class TestBuildPipeline:
@@ -111,29 +114,49 @@ class TestSavePipeline:
                 os.remove(filepath)
 
 
+class _FeatureEngineerAdapter(BaseEstimator, TransformerMixin):
+    """Adapter so Pipeline can call FeatureEngineer's static transform with one argument."""
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        transform_fn = getattr(FeatureEngineer.transform, '__wrapped__', FeatureEngineer.transform)
+        return transform_fn(X)
+
+
 class TestBuildPipelineIntegration:
     """Integration tests for the full pipeline (fit_transform with minimal data)."""
 
-    def _minimal_df_for_pipeline(self, n_rows=3):
+    def _minimal_df_for_pipeline(self, n_rows=5, seed=42):
         """Build a minimal DataFrame that passes cleaner -> engineer -> preprocessor."""
+        np.random.seed(seed)
         numeric_features, categorical_features = get_feature_lists()
         df = pd.DataFrame({
-            'NIVEL_IDEAL_2022': ['ALFA', 'Nivel 1', 'Nivel 1'][:n_rows],
-            'FASE_2022': [0, 1, 1][:n_rows],
-            'NOME': ['A', 'B', 'C'][:n_rows],
-            'INSTITUICAO_ENSINO_ALUNO_2020': ['I1', 'I2', 'I3'][:n_rows],
-            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', 'sim', 'não'][:n_rows],
+            'NIVEL_IDEAL_2022': ['ALFA', 'Nivel 1', 'Nivel 1', 'ALFA', 'Nivel 2'][:n_rows],
+            'FASE_2022': [0, 1, 1, 0, 2][:n_rows],
+            'NOME': ['A', 'B', 'C', 'D', 'E'][:n_rows],
+            'INSTITUICAO_ENSINO_ALUNO_2020': ['I1', 'I2', 'I3', 'I4', 'I5'][:n_rows],
+            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', 'sim', 'não', 'sim', 'não'][:n_rows],
         })
         for c in numeric_features:
             df[c] = np.random.randn(n_rows)
         for c in categorical_features:
-            df[c] = ['X', 'Y', 'X'][:n_rows]
+            df[c] = ['X', 'Y', 'X', 'Y', 'X'][:n_rows]
         return df
+
+    def _build_integration_pipeline(self):
+        """Build pipeline with src imports and adapter so transform works in Pipeline."""
+        return Pipeline(steps=[
+            ('cleaner', DataCleaner()),
+            ('engineer', _FeatureEngineerAdapter()),
+            ('preprocessor', build_preprocessor())
+        ])
 
     @patch('builtins.print')
     def test_pipeline_fit_transform_returns_array(self, mock_print):
         """Test that pipeline fit_transform runs and returns a numpy array."""
-        pipeline = build_pipeline()
+        pipeline = self._build_integration_pipeline()
         X = self._minimal_df_for_pipeline()
         y = X.shape[0] * [0]  # dummy target for fit
         pipeline.fit(X, y)
@@ -145,7 +168,7 @@ class TestBuildPipelineIntegration:
     @patch('builtins.print')
     def test_pipeline_fit_transform_output_has_no_nans(self, mock_print):
         """Test that pipeline fit_transform output has no NaNs for valid input."""
-        pipeline = build_pipeline()
+        pipeline = self._build_integration_pipeline()
         X = self._minimal_df_for_pipeline()
         pipeline.fit(X)
         out = pipeline.transform(X)
