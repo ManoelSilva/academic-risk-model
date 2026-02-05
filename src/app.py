@@ -3,7 +3,7 @@ import pandas as pd
 from flask import Flask, jsonify, request
 import logging
 import traceback
-from src.preprocessing.pipeline import build_pipeline, save_pipeline
+from preprocessing.pipeline import build_pipeline, save_pipeline
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -43,6 +43,30 @@ class AcademicRiskApp:
             except Exception as e:
                 logger.error(f"Pipeline execution failed: {str(e)}")
                 return jsonify({'status': 'error', 'message': str(e)}), 500
+
+        @self.app.route('/train', methods=['POST'])
+        def train_endpoint():
+            data_path = request.json.get('data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
+            return self.train(data_path)
+
+    @staticmethod
+    def train(data_path: str = 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv'):
+        """
+        Triggers the training process via the ModelTrainer.
+        """
+        try:
+            from training.trainer import ModelTrainer
+            trainer = ModelTrainer()
+            best_model, best_score = trainer.train_and_evaluate(data_path)
+            return jsonify({
+                'status': 'success',
+                'best_model': best_model,
+                'recall_score': best_score,
+                'message': 'Training completed successfully'
+            }), 200
+        except Exception as e:
+            logger.error(f"Training failed: {e}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
 
     def run_preprocessing_pipeline(self, data_path: str):
         """
