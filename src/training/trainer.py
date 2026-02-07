@@ -19,6 +19,9 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+import json
+import shutil
+
 
 class ModelTrainer:
     def __init__(self, config=None):
@@ -41,11 +44,11 @@ class ModelTrainer:
         num_feats, cat_feats = get_feature_lists()
         n_features = len(num_feats) + len(cat_feats)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M")
 
         # Construct meaningful experiment name
         self.experiment_name = (
-            f"Exp_{timestamp}_"
+            f"Exp_{self.timestamp}_"
             f"Feats{n_features}_"
             f"CV{self.config['cv_folds']}_"
             f"{self.config['scoring'].capitalize()}"
@@ -55,6 +58,58 @@ class ModelTrainer:
         mlflow.set_experiment(self.experiment_name)
         logger.info(f"Initialized Experiment: {self.experiment_name}")
         logger.info(f"Configuration: {self.config}")
+
+    def save_artifacts(self, model, model_name, score, metrics=None):
+        """
+        Saves the model and metadata in a structured way.
+        
+        Structure:
+        models/
+          artifacts/
+            {experiment_name}/
+              model.joblib
+              metadata.json
+          production/
+            model.joblib  (Copy of best model)
+            metadata.json
+        """
+        # Define paths
+        artifact_dir = os.path.join("models", "artifacts", self.experiment_name)
+        os.makedirs(artifact_dir, exist_ok=True)
+
+        model_path = os.path.join(artifact_dir, "model.joblib")
+        metadata_path = os.path.join(artifact_dir, "metadata.json")
+
+        # Save Model
+        joblib.dump(model, model_path)
+        logger.info(f"Model saved to {model_path}")
+
+        # Prepare Metadata
+        metadata = {
+            "experiment_name": self.experiment_name,
+            "timestamp": self.timestamp,
+            "best_model_name": model_name,
+            "best_score": score,
+            "config": self.config,
+            "metrics": metrics or {}
+        }
+
+        # Save Metadata
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=4)
+        logger.info(f"Metadata saved to {metadata_path}")
+
+        # Promote to Production (Copy)
+        prod_dir = os.path.join("models", "production")
+        os.makedirs(prod_dir, exist_ok=True)
+
+        prod_model_path = os.path.join(prod_dir, "model.joblib")
+        prod_metadata_path = os.path.join(prod_dir, "metadata.json")
+
+        shutil.copy2(model_path, prod_model_path)
+        shutil.copy2(metadata_path, prod_metadata_path)
+
+        logger.info(f"Model promoted to production: {prod_model_path}")
 
     def prepare_data(self, data_path):
         """
@@ -202,9 +257,12 @@ class ModelTrainer:
 
         logger.info(f"\n--- Best Model Selected: {best_model_name} (Score: {best_score:.4f}) ---")
 
-        # Save Best Model locally
-        os.makedirs("models", exist_ok=True)
-        joblib.dump(best_model, "models/best_model.joblib")
-        logger.info("Best model saved to models/best_model.joblib")
+        # Gather final metrics for the best model
+        final_metrics = {
+            "score": best_score,
+            "metric_type": self.config['scoring']
+        }
+
+        self.save_artifacts(best_model, best_model_name, best_score, metrics=final_metrics)
 
         return best_model_name, best_score

@@ -57,10 +57,10 @@ class AcademicRiskApp:
         try:
             from training.trainer import ModelTrainer
             trainer = ModelTrainer()
-            best_model, best_score = trainer.train_and_evaluate(data_path)
+            best_model_name, best_score = trainer.train_and_evaluate(data_path)
             return jsonify({
                 'status': 'success',
-                'best_model': best_model,
+                'best_model': best_model_name,
                 'recall_score': best_score,
                 'message': 'Training completed successfully'
             }), 200
