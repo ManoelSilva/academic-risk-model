@@ -151,6 +151,7 @@ def _make_mock_pipeline(*args, **kwargs):
 class TestTrainAndEvaluate:
     """Test suite for ModelTrainer.train_and_evaluate."""
 
+    @patch('src.training.trainer.ModelEvaluator')
     @patch('src.training.trainer.cross_val_score')
     @patch('src.training.trainer.Pipeline')
     @patch('src.training.trainer.shutil.copy2')
@@ -183,6 +184,7 @@ class TestTrainAndEvaluate:
             mock_copy2,
             mock_pipeline_class,
             mock_cross_val_score,
+            mock_evaluator
     ):
         """Test that train_and_evaluate returns (best_model_name, best_score)."""
         df_clean = _minimal_cleaned_df(n_rows=30)
@@ -197,6 +199,11 @@ class TestTrainAndEvaluate:
 
         mock_cross_val_score.return_value = np.array([0.7, 0.8])
         mock_pipeline_class.side_effect = _make_mock_pipeline
+        
+        # Mock Evaluator
+        mock_evaluator.evaluate.return_value = {
+            'recall': 0.8, 'roc_auc': 0.75, 'f1_score': 0.78, 'classification_report': {}
+        }
 
         with patch('src.training.trainer.mlflow.set_tracking_uri'), \
                 patch('src.training.trainer.mlflow.set_experiment'):
@@ -215,6 +222,7 @@ class TestTrainAndEvaluate:
         assert name in ['Logistic_Regression', 'Random_Forest', 'Gradient_Boosting']
         assert isinstance(score, (int, float))
 
+    @patch('src.training.trainer.ModelEvaluator')
     @patch('src.training.trainer.cross_val_score')
     @patch('src.training.trainer.Pipeline')
     @patch('src.training.trainer.shutil.copy2')
@@ -247,6 +255,7 @@ class TestTrainAndEvaluate:
             mock_copy2,
             mock_pipeline_class,
             mock_cross_val_score,
+            mock_evaluator
     ):
         """Test that train_and_evaluate calls save_artifacts and persists model/metadata."""
         df_clean = _minimal_cleaned_df(n_rows=30)
@@ -259,6 +268,11 @@ class TestTrainAndEvaluate:
 
         mock_cross_val_score.return_value = np.array([0.7, 0.8])
         mock_pipeline_class.side_effect = _make_mock_pipeline
+
+        # Mock Evaluator
+        mock_evaluator.evaluate.return_value = {
+            'recall': 0.8, 'roc_auc': 0.75, 'f1_score': 0.78, 'classification_report': {}
+        }
 
         # Mock open context manager so save_artifacts can write metadata
         mock_open.return_value.__enter__ = MagicMock(return_value=MagicMock())

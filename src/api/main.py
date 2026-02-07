@@ -3,7 +3,8 @@ import pandas as pd
 from flask import Flask, jsonify, request
 import logging
 import traceback
-from preprocessing.pipeline import build_pipeline, save_pipeline
+from src.preprocessing.pipeline import build_pipeline, save_pipeline
+from src.training.trainer import ModelTrainer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -20,7 +21,7 @@ class AcademicRiskApp:
         self.app = Flask(__name__)
         self.setup_routes()
         self.pipeline = None
-        self.model = None  # Placeholder for Phase 3
+        self.model = None
 
     def setup_routes(self):
         """
@@ -55,7 +56,6 @@ class AcademicRiskApp:
         Triggers the training process via the ModelTrainer.
         """
         try:
-            from training.trainer import ModelTrainer
             trainer = ModelTrainer()
             best_model_name, best_score = trainer.train_and_evaluate(data_path)
             return jsonify({
