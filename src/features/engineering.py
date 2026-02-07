@@ -17,8 +17,8 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         df = X.copy()
 
         # Example Feature: Is the student new?
-        if 'SINALIZADOR_INGRESSANTE_2021' in df.columns:
-            df['IS_NEW_STUDENT'] = df['SINALIZADOR_INGRESSANTE_2021'].apply(
+        if 'SINALIZADOR_INGRESSANTE' in df.columns:
+            df['IS_NEW_STUDENT'] = df['SINALIZADOR_INGRESSANTE'].apply(
                 lambda x: 1 if str(x).strip().lower() in ['ingressante', 'sim'] else 0
             )
 

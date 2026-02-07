@@ -31,7 +31,7 @@ class TestFeatureEngineer:
         """Test that transform creates IS_NEW_STUDENT feature correctly."""
         engineer = FeatureEngineer()
         X = pd.DataFrame({
-            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', 'sim', 'não', 'INGRESSANTE', 'Sim']
+            'SINALIZADOR_INGRESSANTE': ['ingressante', 'sim', 'não', 'INGRESSANTE', 'Sim']
         })
 
         result = engineer.transform.__wrapped__(X)
@@ -42,7 +42,7 @@ class TestFeatureEngineer:
     def test_transform_is_new_student_case_insensitive(self):
         """Test that IS_NEW_STUDENT feature is case insensitive."""
         X = pd.DataFrame({
-            'SINALIZADOR_INGRESSANTE_2021': ['INGRESSANTE', 'SIM', 'Não', 'ingressante', 'SiM']
+            'SINALIZADOR_INGRESSANTE': ['INGRESSANTE', 'SIM', 'Não', 'ingressante', 'SiM']
         })
 
         engineer = FeatureEngineer()
@@ -53,7 +53,7 @@ class TestFeatureEngineer:
     def test_transform_is_new_student_with_whitespace(self):
         """Test that IS_NEW_STUDENT handles whitespace correctly."""
         X = pd.DataFrame({
-            'SINALIZADOR_INGRESSANTE_2021': [' ingressante ', '  sim  ', 'não', 'ingressante']
+            'SINALIZADOR_INGRESSANTE': [' ingressante ', '  sim  ', 'não', 'ingressante']
         })
 
         engineer = FeatureEngineer()
@@ -64,7 +64,7 @@ class TestFeatureEngineer:
     def test_transform_is_new_student_with_numeric_values(self):
         """Test that IS_NEW_STUDENT handles numeric values correctly."""
         X = pd.DataFrame({
-            'SINALIZADOR_INGRESSANTE_2021': [1, 0, 'ingressante', 'sim']
+            'SINALIZADOR_INGRESSANTE': [1, 0, 'ingressante', 'sim']
         })
 
         engineer = FeatureEngineer()
@@ -76,7 +76,7 @@ class TestFeatureEngineer:
     def test_transform_is_new_student_with_nan(self):
         """Test that IS_NEW_STUDENT handles NaN values correctly."""
         X = pd.DataFrame({
-            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', np.nan, 'sim', None]
+            'SINALIZADOR_INGRESSANTE': ['ingressante', np.nan, 'sim', None]
         })
 
         engineer = FeatureEngineer()
@@ -143,7 +143,7 @@ class TestFeatureEngineer:
         """Test that transform does not modify the original dataframe."""
         X = pd.DataFrame({
             'NOME': ['João', 'Maria'],
-            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', 'sim']
+            'SINALIZADOR_INGRESSANTE': ['ingressante', 'sim']
         })
         original_columns = X.columns.tolist()
 
@@ -160,7 +160,7 @@ class TestFeatureEngineer:
         X = pd.DataFrame({
             'NOME': ['João', 'Maria', 'Pedro'],
             'INSTITUICAO_ENSINO_ALUNO_2020': ['Escola A', 'Escola B', 'Escola C'],
-            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', 'não', 'sim'],
+            'SINALIZADOR_INGRESSANTE': ['ingressante', 'não', 'sim'],
             'GRADE': [8.5, 7.0, 9.0]
         })
 
@@ -208,7 +208,7 @@ class TestFeatureEngineer:
         engineer = FeatureEngineer()
         X = pd.DataFrame({
             'NOME': ['João', 'Maria'],
-            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', 'sim']
+            'SINALIZADOR_INGRESSANTE': ['ingressante', 'sim']
         })
 
         engineer.fit(X)
