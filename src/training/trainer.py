@@ -5,11 +5,11 @@ import mlflow.sklearn
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.metrics import classification_report, roc_auc_score, recall_score, f1_score
+from src.evaluation.evaluator import ModelEvaluator
 from sklearn.pipeline import Pipeline
-from preprocessing.cleaning import DataCleaner
-from preprocessing.components import build_preprocessor, get_feature_lists
-from features.engineering import FeatureEngineer
+from src.preprocessing.cleaning import DataCleaner
+from src.preprocessing.components import build_preprocessor, get_feature_lists
+from src.features.engineering import FeatureEngineer
 import joblib
 import os
 import logging
@@ -217,26 +217,18 @@ class ModelTrainer:
                 # Fit on full training set
                 full_pipeline.fit(X_train, y_train)
 
-                # Evaluate on Test Set
-                y_pred = full_pipeline.predict(X_test)
-                y_proba = full_pipeline.predict_proba(X_test)[:, 1] if hasattr(full_pipeline, "predict_proba") else None
+                # Evaluate on Test Set using standardized Evaluator
+                metrics = ModelEvaluator.evaluate(full_pipeline, X_test, y_test)
+                
+                logger.info(f"Test Recall: {metrics['recall']:.4f}")
+                logger.info(f"Test ROC-AUC: {metrics['roc_auc']:.4f}")
 
-                # Metrics
-                test_recall = recall_score(y_test, y_pred)
-                test_roc_auc = roc_auc_score(y_test, y_proba) if y_proba is not None else 0
-                test_f1 = f1_score(y_test, y_pred)
-
-                logger.info(f"Test Recall: {test_recall:.4f}")
-                logger.info(f"Test ROC-AUC: {test_roc_auc:.4f}")
-
-                mlflow.log_metric("test_recall", test_recall)
-                mlflow.log_metric("test_roc_auc", test_roc_auc)
-                mlflow.log_metric("test_f1", test_f1)
-
-                # Log Classification Report as artifact
-                report = classification_report(y_test, y_pred, output_dict=True)
-                mlflow.log_dict(report, "classification_report.json")
-
+                ModelEvaluator.log_metrics_to_mlflow(metrics)
+                
+                # Extract metrics for selection logic
+                test_recall = metrics['recall']
+                test_roc_auc = metrics['roc_auc']
+                
                 # Log Model
                 mlflow.sklearn.log_model(full_pipeline, "model")
 
