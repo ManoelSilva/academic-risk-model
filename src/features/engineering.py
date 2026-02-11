@@ -12,8 +12,7 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
         return self
 
-    @staticmethod
-    def transform(X):
+    def transform(self, X):
         df = X.copy()
 
         # Example Feature: Is the student new?

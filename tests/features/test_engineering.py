@@ -34,7 +34,7 @@ class TestFeatureEngineer:
             'SINALIZADOR_INGRESSANTE': ['ingressante', 'sim', 'não', 'INGRESSANTE', 'Sim']
         })
 
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'IS_NEW_STUDENT' in result.columns
         assert result['IS_NEW_STUDENT'].tolist() == [1, 1, 0, 1, 1]
@@ -46,7 +46,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert result['IS_NEW_STUDENT'].tolist() == [1, 1, 0, 1, 1]
 
@@ -57,7 +57,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert result['IS_NEW_STUDENT'].tolist() == [1, 1, 0, 1]
 
@@ -68,7 +68,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         # Numeric values should be converted to string and not match
         assert result['IS_NEW_STUDENT'].tolist() == [0, 0, 1, 1]
@@ -80,7 +80,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         # NaN and None should be converted to string and not match
         assert result['IS_NEW_STUDENT'].tolist() == [1, 0, 1, 0]
@@ -93,7 +93,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'NOME' not in result.columns
         assert 'OTHER_COL' in result.columns
@@ -106,7 +106,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'INSTITUICAO_ENSINO_ALUNO_2020' not in result.columns
         assert 'OTHER_COL' in result.columns
@@ -120,7 +120,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'NOME' not in result.columns
         assert 'INSTITUICAO_ENSINO_ALUNO_2020' not in result.columns
@@ -133,7 +133,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         # Should not raise an error
         assert 'OTHER_COL' in result.columns
@@ -148,7 +148,7 @@ class TestFeatureEngineer:
         original_columns = X.columns.tolist()
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         # Original dataframe should be unchanged
         assert X.columns.tolist() == original_columns
@@ -165,7 +165,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         # Check dropped columns
         assert 'NOME' not in result.columns
@@ -184,7 +184,7 @@ class TestFeatureEngineer:
         X = pd.DataFrame()
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 0
@@ -197,7 +197,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'COL1' in result.columns
         assert 'COL2' in result.columns
@@ -212,7 +212,7 @@ class TestFeatureEngineer:
         })
 
         engineer.fit(X)
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'NOME' not in result.columns
         assert 'IS_NEW_STUDENT' in result.columns
