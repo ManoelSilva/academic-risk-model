@@ -9,12 +9,12 @@ def get_feature_lists():
     Returns the lists of numeric and categorical features used in the model.
     """
     numeric_features = [
-        'INDE_2021', 'IAA_2021', 'IEG_2021', 'IPS_2021', 'IDA_2021',
-        'IPP_2021', 'IPV_2021', 'IAN_2021', 'DEFASAGEM_2021',
-        'IDADE_ALUNO_2020', 'ANOS_PM_2020'
+        'INDE', 'IAA', 'IEG', 'IPS', 'IDA',
+        'IPP', 'IPV', 'IAN', 'DEFASAGEM',
+        'IDADE_ALUNO', 'ANOS_PM'
     ]
 
-    categorical_features = ['PEDRA_2021', 'PONTO_VIRADA_2021']
+    categorical_features = ['PEDRA', 'PONTO_VIRADA']
 
     return numeric_features, categorical_features
 

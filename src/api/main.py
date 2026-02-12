@@ -1,10 +1,12 @@
 import os
 import pandas as pd
+import joblib
 from flask import Flask, jsonify, request
 import logging
 import traceback
-from src.preprocessing.pipeline import build_pipeline, save_pipeline
-from src.training.trainer import ModelTrainer
+from preprocessing.pipeline import build_pipeline, save_pipeline
+from training.trainer import ModelTrainer
+from preprocessing.components import get_feature_lists
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -21,7 +23,41 @@ class AcademicRiskApp:
         self.app = Flask(__name__)
         self.setup_routes()
         self.pipeline = None
-        self.model = None
+
+        # Load production model at startup
+        self.model_path = os.path.join("models", "production", "model.joblib")
+        self.model = self.load_model()
+
+        # Get expected features for validation
+        self.numeric_features, self.categorical_features = get_feature_lists()
+        # Add feature engineering specific columns
+        self.required_columns = self.numeric_features + self.categorical_features + ['SINALIZADOR_INGRESSANTE']
+
+    def load_model(self):
+        """
+        Safely loads the production model.
+        """
+        if os.path.exists(self.model_path):
+            try:
+                model = joblib.load(self.model_path)
+                logger.info(f"Loaded production model from {self.model_path}")
+                return model
+            except Exception as e:
+                logger.error(f"Failed to load model: {e}")
+                return None
+        else:
+            logger.warning(f"No production model found at {self.model_path}")
+            return None
+
+    def validate_input(self, df):
+        """
+        Validates that the input DataFrame contains necessary columns.
+        Returns (is_valid, missing_columns)
+        """
+        missing = [col for col in self.required_columns if col not in df.columns]
+        if missing:
+            return False, missing
+        return True, []
 
     def setup_routes(self):
         """
@@ -30,7 +66,69 @@ class AcademicRiskApp:
 
         @self.app.route('/health', methods=['GET'])
         def health():
-            return jsonify({'status': 'ok', 'message': 'Academic Risk API is running'}), 200
+            status = 'healthy' if self.model is not None else 'degraded (no model loaded)'
+            return jsonify({'status': status, 'message': 'Academic Risk API is running'}), 200
+
+        @self.app.route('/predict', methods=['POST'])
+        def predict():
+            """
+            Inference endpoint.
+            Expects a JSON payload with a list of records.
+            """
+            if self.model is None:
+                # Try reloading
+                self.model = self.load_model()
+                if self.model is None:
+                    return jsonify({'status': 'error', 'message': 'No model loaded for inference'}), 503
+
+            try:
+                data = request.get_json()
+                if not data:
+                    return jsonify({'status': 'error', 'message': 'Empty payload'}), 400
+
+                # Handle single record or list of records
+                if isinstance(data, dict):
+                    data = [data]
+
+                df = pd.DataFrame(data)
+
+                # Validation
+                is_valid, missing = self.validate_input(df)
+                if not is_valid:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Missing required columns: {missing}'
+                    }), 400
+
+                # Inference
+                # predict_proba returns [prob_class_0, prob_class_1]
+                # We want prob_class_1 (risk)
+                if hasattr(self.model, "predict_proba"):
+                    probabilities = self.model.predict_proba(df)[:, 1]
+                else:
+                    probabilities = [None] * len(df)
+
+                predictions = self.model.predict(df)
+
+                results = []
+                for i, (pred, prob) in enumerate(zip(predictions, probabilities)):
+                    results.append({
+                        "id": i,  # Or use an ID from input if available
+                        "risk_prediction": int(pred),
+                        "risk_probability": float(prob) if prob is not None else None,
+                        "risk_label": "High Risk" if pred == 1 else "Low Risk"
+                    })
+
+                return jsonify({
+                    'status': 'success',
+                    'count': len(results),
+                    'predictions': results
+                }), 200
+
+            except Exception as e:
+                logger.error(f"Prediction failed: {e}")
+                traceback.print_exc()
+                return jsonify({'status': 'error', 'message': str(e)}), 500
 
         @self.app.route('/pipeline/run', methods=['POST'])
         def run_pipeline():

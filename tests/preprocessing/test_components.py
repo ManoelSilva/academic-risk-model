@@ -20,9 +20,9 @@ class TestGetFeatureLists:
         """Test that numeric feature list has expected length and known names."""
         numeric, _ = get_feature_lists()
         expected = [
-            'INDE_2021', 'IAA_2021', 'IEG_2021', 'IPS_2021', 'IDA_2021',
-            'IPP_2021', 'IPV_2021', 'IAN_2021', 'DEFASAGEM_2021',
-            'IDADE_ALUNO_2020', 'ANOS_PM_2020'
+            'INDE', 'IAA', 'IEG', 'IPS', 'IDA',
+            'IPP', 'IPV', 'IAN', 'DEFASAGEM',
+            'IDADE_ALUNO', 'ANOS_PM'
         ]
         assert len(numeric) == len(expected)
         assert set(numeric) == set(expected)
@@ -30,7 +30,7 @@ class TestGetFeatureLists:
     def test_categorical_features(self):
         """Test that categorical feature list is as expected."""
         _, categorical = get_feature_lists()
-        expected = ['PEDRA_2021', 'PONTO_VIRADA_2021']
+        expected = ['PEDRA', 'PONTO_VIRADA']
         assert len(categorical) == len(expected)
         assert set(categorical) == set(expected)
 

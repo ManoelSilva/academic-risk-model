@@ -31,10 +31,10 @@ class TestFeatureEngineer:
         """Test that transform creates IS_NEW_STUDENT feature correctly."""
         engineer = FeatureEngineer()
         X = pd.DataFrame({
-            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', 'sim', 'não', 'INGRESSANTE', 'Sim']
+            'SINALIZADOR_INGRESSANTE': ['ingressante', 'sim', 'não', 'INGRESSANTE', 'Sim']
         })
 
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'IS_NEW_STUDENT' in result.columns
         assert result['IS_NEW_STUDENT'].tolist() == [1, 1, 0, 1, 1]
@@ -42,33 +42,33 @@ class TestFeatureEngineer:
     def test_transform_is_new_student_case_insensitive(self):
         """Test that IS_NEW_STUDENT feature is case insensitive."""
         X = pd.DataFrame({
-            'SINALIZADOR_INGRESSANTE_2021': ['INGRESSANTE', 'SIM', 'Não', 'ingressante', 'SiM']
+            'SINALIZADOR_INGRESSANTE': ['INGRESSANTE', 'SIM', 'Não', 'ingressante', 'SiM']
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert result['IS_NEW_STUDENT'].tolist() == [1, 1, 0, 1, 1]
 
     def test_transform_is_new_student_with_whitespace(self):
         """Test that IS_NEW_STUDENT handles whitespace correctly."""
         X = pd.DataFrame({
-            'SINALIZADOR_INGRESSANTE_2021': [' ingressante ', '  sim  ', 'não', 'ingressante']
+            'SINALIZADOR_INGRESSANTE': [' ingressante ', '  sim  ', 'não', 'ingressante']
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert result['IS_NEW_STUDENT'].tolist() == [1, 1, 0, 1]
 
     def test_transform_is_new_student_with_numeric_values(self):
         """Test that IS_NEW_STUDENT handles numeric values correctly."""
         X = pd.DataFrame({
-            'SINALIZADOR_INGRESSANTE_2021': [1, 0, 'ingressante', 'sim']
+            'SINALIZADOR_INGRESSANTE': [1, 0, 'ingressante', 'sim']
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         # Numeric values should be converted to string and not match
         assert result['IS_NEW_STUDENT'].tolist() == [0, 0, 1, 1]
@@ -76,11 +76,11 @@ class TestFeatureEngineer:
     def test_transform_is_new_student_with_nan(self):
         """Test that IS_NEW_STUDENT handles NaN values correctly."""
         X = pd.DataFrame({
-            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', np.nan, 'sim', None]
+            'SINALIZADOR_INGRESSANTE': ['ingressante', np.nan, 'sim', None]
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         # NaN and None should be converted to string and not match
         assert result['IS_NEW_STUDENT'].tolist() == [1, 0, 1, 0]
@@ -93,7 +93,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'NOME' not in result.columns
         assert 'OTHER_COL' in result.columns
@@ -106,7 +106,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'INSTITUICAO_ENSINO_ALUNO_2020' not in result.columns
         assert 'OTHER_COL' in result.columns
@@ -120,7 +120,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'NOME' not in result.columns
         assert 'INSTITUICAO_ENSINO_ALUNO_2020' not in result.columns
@@ -133,7 +133,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         # Should not raise an error
         assert 'OTHER_COL' in result.columns
@@ -143,12 +143,12 @@ class TestFeatureEngineer:
         """Test that transform does not modify the original dataframe."""
         X = pd.DataFrame({
             'NOME': ['João', 'Maria'],
-            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', 'sim']
+            'SINALIZADOR_INGRESSANTE': ['ingressante', 'sim']
         })
         original_columns = X.columns.tolist()
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         # Original dataframe should be unchanged
         assert X.columns.tolist() == original_columns
@@ -160,12 +160,12 @@ class TestFeatureEngineer:
         X = pd.DataFrame({
             'NOME': ['João', 'Maria', 'Pedro'],
             'INSTITUICAO_ENSINO_ALUNO_2020': ['Escola A', 'Escola B', 'Escola C'],
-            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', 'não', 'sim'],
+            'SINALIZADOR_INGRESSANTE': ['ingressante', 'não', 'sim'],
             'GRADE': [8.5, 7.0, 9.0]
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         # Check dropped columns
         assert 'NOME' not in result.columns
@@ -184,7 +184,7 @@ class TestFeatureEngineer:
         X = pd.DataFrame()
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 0
@@ -197,7 +197,7 @@ class TestFeatureEngineer:
         })
 
         engineer = FeatureEngineer()
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'COL1' in result.columns
         assert 'COL2' in result.columns
@@ -208,11 +208,11 @@ class TestFeatureEngineer:
         engineer = FeatureEngineer()
         X = pd.DataFrame({
             'NOME': ['João', 'Maria'],
-            'SINALIZADOR_INGRESSANTE_2021': ['ingressante', 'sim']
+            'SINALIZADOR_INGRESSANTE': ['ingressante', 'sim']
         })
 
         engineer.fit(X)
-        result = engineer.transform.__wrapped__(X)
+        result = engineer.transform(X)
 
         assert 'NOME' not in result.columns
         assert 'IS_NEW_STUDENT' in result.columns

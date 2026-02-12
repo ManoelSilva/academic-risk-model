@@ -46,4 +46,25 @@ class DataCleaner(BaseEstimator, TransformerMixin):
         df = df.drop(columns=cols_to_drop, errors='ignore')
         print(f"Shape after dropping leakage columns: {df.shape}")
 
+        # 6. Standardize Feature Names (Remove Year Suffixes)
+        # We want the model to be year-agnostic for features like INDE, IAA, etc.
+        rename_map = {
+            'INDE_2021': 'INDE',
+            'IAA_2021': 'IAA',
+            'IEG_2021': 'IEG',
+            'IPS_2021': 'IPS',
+            'IDA_2021': 'IDA',
+            'IPP_2021': 'IPP',
+            'IPV_2021': 'IPV',
+            'IAN_2021': 'IAN',
+            'DEFASAGEM_2021': 'DEFASAGEM',
+            'IDADE_ALUNO_2020': 'IDADE_ALUNO',
+            'ANOS_PM_2020': 'ANOS_PM',
+            'PEDRA_2021': 'PEDRA',
+            'PONTO_VIRADA_2021': 'PONTO_VIRADA',
+            'SINALIZADOR_INGRESSANTE_2021': 'SINALIZADOR_INGRESSANTE'
+        }
+        df = df.rename(columns=rename_map)
+        print(f"Columns renamed to generic format.")
+
         return df

@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.base import BaseEstimator, TransformerMixin
 
 from src.preprocessing.components import get_feature_lists, build_preprocessor
 from src.preprocessing.pipeline import build_pipeline, save_pipeline
@@ -114,21 +113,11 @@ class TestSavePipeline:
                 os.remove(filepath)
 
 
-class _FeatureEngineerAdapter(BaseEstimator, TransformerMixin):
-    """Adapter so Pipeline can call FeatureEngineer's static transform with one argument."""
-
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X):
-        transform_fn = getattr(FeatureEngineer.transform, '__wrapped__', FeatureEngineer.transform)
-        return transform_fn(X)
-
-
 class TestBuildPipelineIntegration:
     """Integration tests for the full pipeline (fit_transform with minimal data)."""
 
-    def _minimal_df_for_pipeline(self, n_rows=5, seed=42):
+    @staticmethod
+    def _minimal_df_for_pipeline(n_rows=5, seed=42):
         """Build a minimal DataFrame that passes cleaner -> engineer -> preprocessor."""
         np.random.seed(seed)
         numeric_features, categorical_features = get_feature_lists()
@@ -145,11 +134,12 @@ class TestBuildPipelineIntegration:
             df[c] = ['X', 'Y', 'X', 'Y', 'X'][:n_rows]
         return df
 
-    def _build_integration_pipeline(self):
+    @staticmethod
+    def _build_integration_pipeline():
         """Build pipeline with src imports and adapter so transform works in Pipeline."""
         return Pipeline(steps=[
             ('cleaner', DataCleaner()),
-            ('engineer', _FeatureEngineerAdapter()),
+            ('engineer', FeatureEngineer()),
             ('preprocessor', build_preprocessor())
         ])
 
