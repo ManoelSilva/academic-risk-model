@@ -5,11 +5,11 @@ import mlflow.sklearn
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from src.evaluation.evaluator import ModelEvaluator
+from evaluation.evaluator import ModelEvaluator
 from sklearn.pipeline import Pipeline
-from src.preprocessing.cleaning import DataCleaner
-from src.preprocessing.components import build_preprocessor, get_feature_lists
-from src.features.engineering import FeatureEngineer
+from preprocessing.cleaning import DataCleaner
+from preprocessing.components import build_preprocessor, get_feature_lists
+from features.engineering import FeatureEngineer
 import joblib
 import os
 import logging
