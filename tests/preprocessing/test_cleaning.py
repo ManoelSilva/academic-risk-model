@@ -143,7 +143,26 @@ class TestDataCleaner:
         assert result['TARGET'].tolist() == [0, 0, 0]
 
     @patch('builtins.print')
-    def test_fit_transform_workflow(self, mock_print):
+    def test_transform_renames_columns_to_generic(self, mock_print):
+        """Test that transform renames year-suffixed columns to generic names."""
+        cleaner = DataCleaner()
+        X = pd.DataFrame({
+            'NIVEL_IDEAL_2022': ['ALFA', 'Nivel 1'],
+            'FASE_2022': [0, 1],
+            'INDE_2021': [1.0, 2.0],
+            'IAA_2021': [3.0, 4.0]
+        })
+        result = cleaner.transform(X)
+        assert 'INDE' in result.columns
+        assert 'IAA' in result.columns
+        assert 'INDE_2021' not in result.columns
+        assert 'IAA_2021' not in result.columns
+
+        # TARGET calculation should still work and be present
+        assert 'TARGET' in result.columns
+
+    @patch('builtins.print')
+    def test_transform_fit_transform_workflow(self, mock_print):
         """Test fit then transform workflow."""
         cleaner = DataCleaner()
         X = pd.DataFrame({

@@ -30,7 +30,7 @@ class TestGetFeatureLists:
     def test_categorical_features(self):
         """Test that categorical feature list is as expected."""
         _, categorical = get_feature_lists()
-        expected = ['PEDRA', 'PONTO_VIRADA']
+        expected = ['PEDRA', 'PONTO_VIRADA', 'IS_NEW_STUDENT']
         assert len(categorical) == len(expected)
         assert set(categorical) == set(expected)
 
@@ -102,12 +102,23 @@ class TestBuildPreprocessor:
     def test_handles_missing_categorical_values(self):
         """Test that preprocessor imputes missing categorical values."""
         numeric_features, categorical_features = get_feature_lists()
+        # Categorical features: PEDRA, PONTO_VIRADA, IS_NEW_STUDENT
+
         X = pd.DataFrame(
             {c: [1.0, 2.0, 3.0] for c in numeric_features},
             columns=numeric_features
         )
-        X[categorical_features[0]] = ['A', np.nan, 'A']
-        X[categorical_features[1]] = ['P', 'P', 'Q']
+
+        # Manually set columns to ensure all 3 are present
+        # We need to make sure we don't assume only 2 columns if list grew
+        for i, c in enumerate(categorical_features):
+            if i == 0:
+                X[c] = ['A', np.nan, 'A']
+            elif i == 1:
+                X[c] = ['P', 'P', 'Q']
+            else:
+                X[c] = ['X', 'Y', 'Z']  # Fallback for new columns like IS_NEW_STUDENT
+
         preprocessor = build_preprocessor()
         out = preprocessor.fit_transform(X)
         assert out is not None

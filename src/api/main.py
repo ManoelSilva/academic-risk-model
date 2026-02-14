@@ -30,8 +30,16 @@ class AcademicRiskApp:
 
         # Get expected features for validation
         self.numeric_features, self.categorical_features = get_feature_lists()
-        # Add feature engineering specific columns
-        self.required_columns = self.numeric_features + self.categorical_features + ['SINALIZADOR_INGRESSANTE']
+
+        # Define derived features that should NOT be expected in raw input
+        derived_features = ['IS_NEW_STUDENT']
+
+        # Filter derived features from required input columns
+        input_numeric = [f for f in self.numeric_features if f not in derived_features]
+        input_categorical = [f for f in self.categorical_features if f not in derived_features]
+
+        # Add raw features that are necessary for derivation
+        self.required_columns = input_numeric + input_categorical + ['SINALIZADOR_INGRESSANTE']
 
     def load_model(self):
         """
@@ -136,7 +144,8 @@ class AcademicRiskApp:
             Trigger the preprocessing pipeline execution.
             """
             try:
-                data_path = request.json.get('data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
+                body = request.get_json(silent=True) or {}
+                data_path = body.get('data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
                 self.run_preprocessing_pipeline(data_path)
                 return jsonify({'status': 'success', 'message': 'Pipeline executed successfully'}), 200
             except Exception as e:
@@ -145,7 +154,8 @@ class AcademicRiskApp:
 
         @self.app.route('/train', methods=['POST'])
         def train_endpoint():
-            data_path = request.json.get('data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
+            body = request.get_json(silent=True) or {}
+            data_path = body.get('data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
             return self.train(data_path)
 
     @staticmethod
