@@ -14,7 +14,7 @@ def get_feature_lists():
         'IDADE_ALUNO', 'ANOS_PM'
     ]
 
-    categorical_features = ['PEDRA', 'PONTO_VIRADA']
+    categorical_features = ['PEDRA', 'PONTO_VIRADA', 'IS_NEW_STUDENT']
 
     return numeric_features, categorical_features
 
