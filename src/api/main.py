@@ -4,13 +4,16 @@ import joblib
 from flask import Flask, jsonify, request
 import logging
 import traceback
+import json
+from datetime import datetime
 from preprocessing.pipeline import build_pipeline, save_pipeline
 from training.trainer import ModelTrainer
 from preprocessing.components import get_feature_lists
+from utils.logger import setup_logger
+from monitoring.drift import DriftDetector
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = setup_logger("api")
 
 
 class AcademicRiskApp:
@@ -24,8 +27,15 @@ class AcademicRiskApp:
         self.setup_routes()
         self.pipeline = None
 
+        # Load configuration from environment variables
+        self.model_path = os.getenv("MODEL_PATH", os.path.join("models", "production", "model.joblib"))
+        self.data_path = os.getenv("DATA_PATH", "data/raw/PEDE_PASSOS_DATASET_FIAP.csv")
+        self.log_level = os.getenv("LOG_LEVEL", "INFO")
+        
+        # Configure logging based on env var
+        logging.getLogger().setLevel(self.log_level)
+
         # Load production model at startup
-        self.model_path = os.path.join("models", "production", "model.joblib")
         self.model = self.load_model()
 
         # Get expected features for validation
@@ -127,6 +137,16 @@ class AcademicRiskApp:
                         "risk_label": "High Risk" if pred == 1 else "Low Risk"
                     })
 
+                # Log prediction
+                for res in results:
+                     logger.info("prediction_made", extra={
+                         "event": "prediction", 
+                         "input_id": res["id"],
+                         "prediction": res["risk_prediction"],
+                         "probability": res["risk_probability"],
+                         "timestamp": datetime.now().isoformat()
+                     })
+
                 return jsonify({
                     'status': 'success',
                     'count': len(results),
@@ -157,6 +177,34 @@ class AcademicRiskApp:
             body = request.get_json(silent=True) or {}
             data_path = body.get('data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
             return self.train(data_path)
+
+        @self.app.route('/monitoring/drift', methods=['POST'])
+        def check_drift():
+            """
+            Triggers a data drift check.
+            Expects JSON with 'current_data_path' (optional, defaults to raw data for demo).
+            """
+            try:
+                body = request.get_json(silent=True) or {}
+                # In production, this would point to a collected batch of recent inference data
+                current_data_path = body.get('current_data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
+                reference_data_path = body.get('reference_data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
+
+                if not os.path.exists(current_data_path):
+                     return jsonify({'status': 'error', 'message': f'Current data file not found: {current_data_path}'}), 404
+                
+                detector = DriftDetector(reference_data_path, current_data_path)
+                result = detector.run_drift_check()
+                
+                return jsonify({
+                    'status': 'success',
+                    'drift_detected': result['drift_detected'],
+                    'report_path': result['html_report']
+                }), 200
+
+            except Exception as e:
+                logger.error(f"Drift check failed: {e}")
+                return jsonify({'status': 'error', 'message': str(e)}), 500
 
     @staticmethod
     def train(data_path: str = 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv'):
@@ -213,10 +261,13 @@ class AcademicRiskApp:
             traceback.print_exc()
             raise e
 
-    def run_server(self, host='0.0.0.0', port=5000):
+    def run_server(self, host='0.0.0.0', port=None):
         """
         Starts the Flask API server.
         """
+        if port is None:
+            port = int(os.getenv("PORT", 5000))
+            
         logger.info(f"Starting API server on {host}:{port}")
         self.app.run(host=host, port=port)
 
