@@ -54,7 +54,7 @@ class ModelTrainer:
             f"{self.config['scoring'].capitalize()}"
         )
 
-        mlflow.set_tracking_uri("file:./mlruns")
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
         mlflow.set_experiment(self.experiment_name)
         logger.info(f"Initialized Experiment: {self.experiment_name}")
         logger.info(f"Configuration: {self.config}")
