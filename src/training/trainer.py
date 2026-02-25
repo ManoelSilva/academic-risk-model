@@ -1,26 +1,28 @@
-import pandas as pd
-import numpy as np
-import mlflow
-import mlflow.sklearn
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from evaluation.evaluator import ModelEvaluator
-from sklearn.pipeline import Pipeline
-from preprocessing.cleaning import DataCleaner
-from preprocessing.components import build_preprocessor, get_feature_lists
-from features.engineering import FeatureEngineer
-import joblib
+import time
+import json
+import shutil
 import os
 import logging
 from datetime import datetime
 
-# Configure logging
+import pandas as pd
+import numpy as np
+import mlflow
+import mlflow.sklearn
+import joblib
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.pipeline import Pipeline
+
+from evaluation.evaluator import ModelEvaluator
+from preprocessing.cleaning import DataCleaner
+from preprocessing.components import build_preprocessor, get_feature_lists
+from features.engineering import FeatureEngineer
+from monitoring.metrics import TRAINING_DURATION, TRAINING_CV_SCORE
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-import json
-import shutil
 
 
 class ModelTrainer:
@@ -54,7 +56,7 @@ class ModelTrainer:
             f"{self.config['scoring'].capitalize()}"
         )
 
-        mlflow.set_tracking_uri("file:./mlruns")
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
         mlflow.set_experiment(self.experiment_name)
         logger.info(f"Initialized Experiment: {self.experiment_name}")
         logger.info(f"Configuration: {self.config}")
@@ -177,27 +179,24 @@ class ModelTrainer:
 
         for name, model in models.items():
             with mlflow.start_run(run_name=f"Train_{name}"):
+                train_start = time.perf_counter()
                 logger.info(f"Training {name}...")
 
-                # Log hyperparameters
                 mlflow.log_params(self.config)
 
-                # Construct full pipeline: FeatureEngineer -> ColumnTransformer -> Model
                 full_pipeline = Pipeline(steps=[
                     ('engineer', FeatureEngineer()),
                     ('preprocessor', preprocessor),
                     ('classifier', model)
                 ])
 
-                # Cross-Validation
                 scoring_metric = self.config['scoring']
-                # Ensure scorer is valid (simple check)
                 if scoring_metric == 'recall':
                     scorer = 'recall'
                 elif scoring_metric == 'roc_auc':
                     scorer = 'roc_auc'
                 else:
-                    scorer = scoring_metric  # fallback to string
+                    scorer = scoring_metric
 
                 cv_scores = cross_val_score(
                     full_pipeline, X_train, y_train,
@@ -214,33 +213,38 @@ class ModelTrainer:
                 mlflow.log_metric(f"cv_std_{scoring_metric}", std_cv_score)
                 mlflow.log_param("model_type", name)
 
-                # Fit on full training set
+                TRAINING_CV_SCORE.labels(
+                    stat="mean", metric_name=scoring_metric, model_type=name
+                ).set(mean_cv_score)
+                TRAINING_CV_SCORE.labels(
+                    stat="std", metric_name=scoring_metric, model_type=name
+                ).set(std_cv_score)
+
                 full_pipeline.fit(X_train, y_train)
 
-                # Evaluate on Test Set using standardized Evaluator
                 metrics = ModelEvaluator.evaluate(full_pipeline, X_test, y_test)
-                
+
                 logger.info(f"Test Recall: {metrics['recall']:.4f}")
                 logger.info(f"Test ROC-AUC: {metrics['roc_auc']:.4f}")
 
                 ModelEvaluator.log_metrics_to_mlflow(metrics)
-                
-                # Extract metrics for selection logic
+
                 test_recall = metrics['recall']
                 test_roc_auc = metrics['roc_auc']
-                
-                # Log Model
+
                 mlflow.sklearn.log_model(full_pipeline, "model")
 
-                # Model Selection Logic (Based on configured scoring metric)
-                # We default to comparing the TEST score of the chosen metric
+                train_elapsed = time.perf_counter() - train_start
+                TRAINING_DURATION.labels(model_type=name).observe(train_elapsed)
+                mlflow.log_metric("training_duration_seconds", train_elapsed)
+
                 current_score = 0
                 if scoring_metric == 'recall':
                     current_score = test_recall
                 elif scoring_metric == 'roc_auc':
                     current_score = test_roc_auc
                 else:
-                    current_score = test_recall  # fallback
+                    current_score = test_recall
 
                 if current_score > best_score:
                     best_score = current_score
@@ -249,12 +253,42 @@ class ModelTrainer:
 
         logger.info(f"\n--- Best Model Selected: {best_model_name} (Score: {best_score:.4f}) ---")
 
-        # Gather final metrics for the best model
         final_metrics = {
             "score": best_score,
             "metric_type": self.config['scoring']
         }
 
         self.save_artifacts(best_model, best_model_name, best_score, metrics=final_metrics)
+        self._register_model(best_model, best_model_name, best_score, final_metrics)
 
         return best_model_name, best_score
+
+    def _register_model(self, model, model_name, score, metrics):
+        """Register the best model in MLflow Model Registry with proper versioning."""
+        try:
+            tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns")
+            if tracking_uri.startswith("file:"):
+                logger.info("MLflow Model Registry requires a tracking server; skipping registration for local file store.")
+                return
+
+            registered_name = "academic-risk-classifier"
+            with mlflow.start_run(run_name=f"Register_{model_name}"):
+                mlflow.log_params({
+                    "model_type": model_name,
+                    "scoring": self.config["scoring"],
+                    "experiment_name": self.experiment_name,
+                })
+                mlflow.log_metric("best_score", score)
+                for k, v in metrics.items():
+                    if isinstance(v, (int, float)):
+                        mlflow.log_metric(k, v)
+
+                model_info = mlflow.sklearn.log_model(
+                    model,
+                    artifact_path="model",
+                    registered_model_name=registered_name,
+                )
+                logger.info(f"Model registered as '{registered_name}' version: {model_info.registered_model_version}")
+
+        except Exception as e:
+            logger.warning(f"MLflow Model Registry registration skipped: {e}")

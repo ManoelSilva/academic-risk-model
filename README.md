@@ -15,6 +15,32 @@ The system predicts whether a student is at risk of falling behind in their educ
 - **API**: Flask-based REST API for inference and training orchestration.
 - **Dockerized**: Production-ready containerization.
 
+## 🚀 Deployment
+
+### 1. Provision Infrastructure
+Before deploying via GitHub Actions, you must provision the AWS infrastructure using Terraform.
+
+```bash
+cd terraform
+terraform init
+terraform apply
+```
+
+After the `apply` command finishes, it will output the `public_ip`. You need this IP for the GitHub Secrets.
+
+### 2. Configure GitHub Secrets
+Go to your repository settings -> Secrets and variables -> Actions, and add the following secrets:
+
+- `EC2_HOST`: The `public_ip` output from Terraform.
+- `EC2_USER`: `ec2-user`
+- `EC2_SSH_KEY`: The private key content of your `~/.ssh/id_rsa` (or the key you used in Terraform).
+
+### 3. Automatic Deployment
+Pushing to the `main` branch will trigger the **Deploy to AWS** workflow, which:
+1. SSHs into the EC2 instance.
+2. Pulls the latest code.
+3. Rebuilds and restarts the Docker containers.
+
 ---
 
 ## 🏗 Architecture
