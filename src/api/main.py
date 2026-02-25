@@ -1,7 +1,8 @@
 import os
+import time
 import pandas as pd
 import joblib
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 import logging
 import traceback
 import json
@@ -11,8 +12,16 @@ from training.trainer import ModelTrainer
 from preprocessing.components import get_feature_lists
 from utils.logger import setup_logger
 from monitoring.drift import DriftDetector
+from monitoring.metrics import (
+    MODEL_INFO, MODEL_LOADED,
+    PREDICTION_REQUEST_COUNT, PREDICTION_LATENCY, PREDICTION_PROBABILITY,
+    PREDICTIONS_HIGH_RISK, PREDICTIONS_LOW_RISK,
+    TRAINING_REQUESTS, TRAINING_BEST_SCORE,
+    DRIFT_CHECK_COUNT, DRIFT_DETECTED, DRIFT_CHECK_DURATION,
+    HTTP_REQUEST_COUNT, HTTP_REQUEST_LATENCY,
+    metrics_response,
+)
 
-# Configure logging
 logger = setup_logger("api")
 
 
@@ -27,44 +36,65 @@ class AcademicRiskApp:
         self.setup_routes()
         self.pipeline = None
 
-        # Load configuration from environment variables
         self.model_path = os.getenv("MODEL_PATH", os.path.join("models", "production", "model.joblib"))
         self.data_path = os.getenv("DATA_PATH", "data/raw/PEDE_PASSOS_DATASET_FIAP.csv")
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
         
-        # Configure logging based on env var
         logging.getLogger().setLevel(self.log_level)
 
-        # Load production model at startup
         self.model = self.load_model()
 
-        # Get expected features for validation
         self.numeric_features, self.categorical_features = get_feature_lists()
 
-        # Define derived features that should NOT be expected in raw input
         derived_features = ['IS_NEW_STUDENT']
-
-        # Filter derived features from required input columns
         input_numeric = [f for f in self.numeric_features if f not in derived_features]
         input_categorical = [f for f in self.categorical_features if f not in derived_features]
-
-        # Add raw features that are necessary for derivation
         self.required_columns = input_numeric + input_categorical + ['SINALIZADOR_INGRESSANTE']
 
+        MODEL_INFO.info({
+            "model_path": self.model_path,
+            "environment": os.getenv("ENVIRONMENT", "production"),
+        })
+
+        self._register_request_hooks()
+
+    def _register_request_hooks(self):
+        """Register before/after request hooks for HTTP-level metrics."""
+        @self.app.before_request
+        def _start_timer():
+            request._start_time = time.perf_counter()
+
+        @self.app.after_request
+        def _record_metrics(response):
+            if request.path == "/metrics":
+                return response
+            elapsed = time.perf_counter() - getattr(request, "_start_time", time.perf_counter())
+            endpoint = request.path
+            HTTP_REQUEST_COUNT.labels(
+                method=request.method,
+                endpoint=endpoint,
+                status_code=response.status_code,
+            ).inc()
+            HTTP_REQUEST_LATENCY.labels(
+                method=request.method,
+                endpoint=endpoint,
+            ).observe(elapsed)
+            return response
+
     def load_model(self):
-        """
-        Safely loads the production model.
-        """
         if os.path.exists(self.model_path):
             try:
                 model = joblib.load(self.model_path)
                 logger.info(f"Loaded production model from {self.model_path}")
+                MODEL_LOADED.set(1)
                 return model
             except Exception as e:
                 logger.error(f"Failed to load model: {e}")
+                MODEL_LOADED.set(0)
                 return None
         else:
             logger.warning(f"No production model found at {self.model_path}")
+            MODEL_LOADED.set(0)
             return None
 
     def validate_input(self, df):
@@ -78,9 +108,11 @@ class AcademicRiskApp:
         return True, []
 
     def setup_routes(self):
-        """
-        Defines the Flask API endpoints.
-        """
+
+        @self.app.route('/metrics', methods=['GET'])
+        def prometheus_metrics():
+            body, status, headers = metrics_response()
+            return Response(body, status=status, headers=headers)
 
         @self.app.route('/health', methods=['GET'])
         def health():
@@ -89,38 +121,32 @@ class AcademicRiskApp:
 
         @self.app.route('/predict', methods=['POST'])
         def predict():
-            """
-            Inference endpoint.
-            Expects a JSON payload with a list of records.
-            """
             if self.model is None:
-                # Try reloading
                 self.model = self.load_model()
                 if self.model is None:
+                    PREDICTION_REQUEST_COUNT.labels(status="error", risk_label="none").inc()
                     return jsonify({'status': 'error', 'message': 'No model loaded for inference'}), 503
 
+            start = time.perf_counter()
             try:
                 data = request.get_json()
                 if not data:
+                    PREDICTION_REQUEST_COUNT.labels(status="error", risk_label="none").inc()
                     return jsonify({'status': 'error', 'message': 'Empty payload'}), 400
 
-                # Handle single record or list of records
                 if isinstance(data, dict):
                     data = [data]
 
                 df = pd.DataFrame(data)
 
-                # Validation
                 is_valid, missing = self.validate_input(df)
                 if not is_valid:
+                    PREDICTION_REQUEST_COUNT.labels(status="error", risk_label="none").inc()
                     return jsonify({
                         'status': 'error',
                         'message': f'Missing required columns: {missing}'
                     }), 400
 
-                # Inference
-                # predict_proba returns [prob_class_0, prob_class_1]
-                # We want prob_class_1 (risk)
                 if hasattr(self.model, "predict_proba"):
                     probabilities = self.model.predict_proba(df)[:, 1]
                 else:
@@ -128,24 +154,38 @@ class AcademicRiskApp:
 
                 predictions = self.model.predict(df)
 
+                elapsed = time.perf_counter() - start
+                PREDICTION_LATENCY.observe(elapsed)
+
                 results = []
                 for i, (pred, prob) in enumerate(zip(predictions, probabilities)):
+                    label = "High Risk" if pred == 1 else "Low Risk"
                     results.append({
-                        "id": i,  # Or use an ID from input if available
+                        "id": i,
                         "risk_prediction": int(pred),
                         "risk_probability": float(prob) if prob is not None else None,
-                        "risk_label": "High Risk" if pred == 1 else "Low Risk"
+                        "risk_label": label,
                     })
 
-                # Log prediction
+                    PREDICTION_REQUEST_COUNT.labels(status="success", risk_label=label).inc()
+
+                    if prob is not None:
+                        PREDICTION_PROBABILITY.observe(float(prob))
+
+                    if pred == 1:
+                        PREDICTIONS_HIGH_RISK.inc()
+                    else:
+                        PREDICTIONS_LOW_RISK.inc()
+
                 for res in results:
-                     logger.info("prediction_made", extra={
-                         "event": "prediction", 
-                         "input_id": res["id"],
-                         "prediction": res["risk_prediction"],
-                         "probability": res["risk_probability"],
-                         "timestamp": datetime.now().isoformat()
-                     })
+                    logger.info("prediction_made", extra={
+                        "event": "prediction",
+                        "input_id": res["id"],
+                        "prediction": res["risk_prediction"],
+                        "probability": res["risk_probability"],
+                        "latency_ms": round(elapsed * 1000, 2),
+                        "timestamp": datetime.now().isoformat(),
+                    })
 
                 return jsonify({
                     'status': 'success',
@@ -154,6 +194,7 @@ class AcademicRiskApp:
                 }), 200
 
             except Exception as e:
+                PREDICTION_REQUEST_COUNT.labels(status="error", risk_label="none").inc()
                 logger.error(f"Prediction failed: {e}")
                 traceback.print_exc()
                 return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -176,26 +217,42 @@ class AcademicRiskApp:
         def train_endpoint():
             body = request.get_json(silent=True) or {}
             data_path = body.get('data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
-            return self.train(data_path)
+            start = time.perf_counter()
+            result = self.train(data_path)
+            elapsed = time.perf_counter() - start
+            response, status_code = result
+            if status_code == 200:
+                TRAINING_REQUESTS.labels(status="success").inc()
+                resp_data = response.get_json()
+                best_model = resp_data.get("best_model", "unknown")
+                best_score = resp_data.get("recall_score", 0)
+                TRAINING_BEST_SCORE.labels(
+                    metric_name="recall", model_type=best_model
+                ).set(best_score)
+            else:
+                TRAINING_REQUESTS.labels(status="error").inc()
+            return result
 
         @self.app.route('/monitoring/drift', methods=['POST'])
         def check_drift():
-            """
-            Triggers a data drift check.
-            Expects JSON with 'current_data_path' (optional, defaults to raw data for demo).
-            """
+            start = time.perf_counter()
             try:
                 body = request.get_json(silent=True) or {}
-                # In production, this would point to a collected batch of recent inference data
                 current_data_path = body.get('current_data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
                 reference_data_path = body.get('reference_data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
 
                 if not os.path.exists(current_data_path):
-                     return jsonify({'status': 'error', 'message': f'Current data file not found: {current_data_path}'}), 404
-                
+                    DRIFT_CHECK_COUNT.labels(status="error").inc()
+                    return jsonify({'status': 'error', 'message': f'Current data file not found: {current_data_path}'}), 404
+
                 detector = DriftDetector(reference_data_path, current_data_path)
                 result = detector.run_drift_check()
-                
+
+                elapsed = time.perf_counter() - start
+                DRIFT_CHECK_DURATION.observe(elapsed)
+                DRIFT_CHECK_COUNT.labels(status="success").inc()
+                DRIFT_DETECTED.set(1 if result['drift_detected'] else 0)
+
                 return jsonify({
                     'status': 'success',
                     'drift_detected': result['drift_detected'],
@@ -203,14 +260,12 @@ class AcademicRiskApp:
                 }), 200
 
             except Exception as e:
+                DRIFT_CHECK_COUNT.labels(status="error").inc()
                 logger.error(f"Drift check failed: {e}")
                 return jsonify({'status': 'error', 'message': str(e)}), 500
 
     @staticmethod
     def train(data_path: str = 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv'):
-        """
-        Triggers the training process via the ModelTrainer.
-        """
         try:
             trainer = ModelTrainer()
             best_model_name, best_score = trainer.train_and_evaluate(data_path)
