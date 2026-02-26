@@ -34,8 +34,7 @@ RUN chown -R appuser:appuser /app
 # Switch to the non-root user
 USER appuser
 
-# Make port 5000 available to the world outside this container
-EXPOSE 5000
+EXPOSE ${PORT:-5000}
 
 ENV PYTHONPATH=/app/src
 
