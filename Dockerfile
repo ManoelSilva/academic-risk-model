@@ -25,8 +25,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the application code
 COPY src/ src/
 COPY data/ data/
-COPY models/ models/
 # Note: Ensure models/production/model.joblib exists before building if you want a baked-in model.
+#COPY models/ models/
 
 # Change ownership of the application directory to the non-root user
 RUN chown -R appuser:appuser /app
