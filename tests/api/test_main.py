@@ -36,6 +36,18 @@ class TestAcademicRiskApp:
         data = json.loads(response.data)
         assert data['status'] == 'healthy'
 
+    def test_swagger_spec_available(self, client):
+        """Test the /swagger.yml endpoint."""
+        response = client.get('/swagger.yml')
+        assert response.status_code == 200
+        assert b'openapi: 3.0.3' in response.data
+
+    def test_swagger_ui_available(self, client):
+        """Test the /docs endpoint."""
+        response = client.get('/docs')
+        assert response.status_code == 200
+        assert b'SwaggerUIBundle' in response.data
+
     def test_predict_success(self, client):
         """Test the /predict endpoint with valid data."""
         # Generic names as expected by the updated API
@@ -114,6 +126,15 @@ class TestAcademicRiskApp:
         with patch('src.api.main.ModelTrainer') as MockTrainer:
             mock_instance = MockTrainer.return_value
             mock_instance.train_and_evaluate.return_value = ("BestModel", 0.95)
+            mock_instance.experiment_name = "Exp_test"
+            mock_instance.config = {
+                "test_size": 0.2,
+                "random_state": 42,
+                "cv_folds": 5,
+                "scoring": "recall",
+                "class_weight": "balanced",
+                "models_to_run": ["Logistic_Regression", "Random_Forest", "Gradient_Boosting"]
+            }
 
             app = AcademicRiskApp()
             client = app.app.test_client()
@@ -123,3 +144,62 @@ class TestAcademicRiskApp:
             data = json.loads(response.data)
             assert data['status'] == 'success'
             assert data['best_model'] == 'BestModel'
+            assert data['experiment_name'] == 'Exp_test'
+            assert 'training_config' in data
+
+    def test_train_endpoint_with_custom_params(self):
+        """Test /train parses and forwards custom training params."""
+        with patch('src.api.main.ModelTrainer') as MockTrainer:
+            mock_instance = MockTrainer.return_value
+            mock_instance.train_and_evaluate.return_value = ("BestModel", 0.91)
+            mock_instance.experiment_name = "Exp_custom"
+            mock_instance.config = {
+                "test_size": 0.3,
+                "random_state": 77,
+                "cv_folds": 3,
+                "scoring": "roc_auc",
+                "class_weight": "balanced",
+                "models_to_run": ["Logistic_Regression"]
+            }
+
+            app = AcademicRiskApp()
+            client = app.app.test_client()
+
+            payload = {
+                "training_params": {
+                    "test_size": 0.3,
+                    "random_state": 77,
+                    "cv_folds": 3,
+                    "scoring": "roc_auc",
+                    "models_to_run": ["Logistic_Regression"]
+                }
+            }
+            response = client.post('/train', json=payload)
+            assert response.status_code == 200
+
+            expected_config = {
+                "test_size": 0.3,
+                "random_state": 77,
+                "cv_folds": 3,
+                "scoring": "roc_auc",
+                "class_weight": "balanced",
+                "models_to_run": ["Logistic_Regression"]
+            }
+            MockTrainer.assert_called_with(config=expected_config)
+
+    def test_train_endpoint_rejects_invalid_params(self):
+        """Test /train returns 400 for invalid custom params."""
+        app = AcademicRiskApp()
+        client = app.app.test_client()
+
+        payload = {
+            "training_params": {
+                "cv_folds": 1,
+                "scoring": "accuracy"
+            }
+        }
+        response = client.post('/train', json=payload)
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'errors' in data

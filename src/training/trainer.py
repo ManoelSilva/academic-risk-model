@@ -3,6 +3,7 @@ import json
 import shutil
 import os
 import logging
+import re
 from datetime import datetime
 
 import pandas as pd
@@ -47,19 +48,46 @@ class ModelTrainer:
         n_features = len(num_feats) + len(cat_feats)
 
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-
-        # Construct meaningful experiment name
-        self.experiment_name = (
-            f"Exp_{self.timestamp}_"
-            f"Feats{n_features}_"
-            f"CV{self.config['cv_folds']}_"
-            f"{self.config['scoring'].capitalize()}"
-        )
+        self.experiment_name = self._build_experiment_name(n_features)
 
         mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
         mlflow.set_experiment(self.experiment_name)
         logger.info(f"Initialized Experiment: {self.experiment_name}")
         logger.info(f"Configuration: {self.config}")
+
+    @staticmethod
+    def _sanitize_experiment_fragment(value):
+        """
+        Convert config values into safe fragments for MLflow experiment names.
+        """
+        text = str(value)
+        text = text.replace(" ", "_")
+        return re.sub(r"[^A-Za-z0-9._-]", "-", text)
+
+    def _build_experiment_name(self, n_features):
+        """
+        Build experiment name using selected training parameter names and values.
+        """
+        tracked_keys = [
+            "scoring",
+            "cv_folds",
+            "test_size",
+            "random_state",
+            "class_weight",
+            "models_to_run",
+        ]
+
+        param_fragments = []
+        for key in tracked_keys:
+            raw_value = self.config.get(key)
+            if isinstance(raw_value, list):
+                value = "+".join([self._sanitize_experiment_fragment(v) for v in raw_value]) or "none"
+            else:
+                value = self._sanitize_experiment_fragment(raw_value)
+            param_fragments.append(f"{key}-{value}")
+
+        params_part = "_".join(param_fragments)
+        return f"Exp_{self.timestamp}_Feats{n_features}_{params_part}"
 
     def save_artifacts(self, model, model_name, score, metrics=None):
         """
