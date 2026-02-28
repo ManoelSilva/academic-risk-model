@@ -2,13 +2,14 @@ import os
 import time
 import pandas as pd
 import joblib
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request, Response, send_file
 import logging
 import traceback
 import json
 from datetime import datetime
 from preprocessing.pipeline import build_pipeline, save_pipeline
 from training.trainer import ModelTrainer
+from api.training_params import DEFAULT_TRAINING_CONFIG, parse_training_params
 from preprocessing.components import get_feature_lists
 from utils.logger import setup_logger
 from monitoring.drift import DriftDetector
@@ -33,6 +34,8 @@ class AcademicRiskApp:
 
     def __init__(self):
         self.app = Flask(__name__)
+        self.swagger_path = os.path.join(os.path.dirname(__file__), "swagger.yml")
+        self.swagger_ui_path = os.path.join(os.path.dirname(__file__), "docs", "swagger_ui.html")
         self.setup_routes()
         self.pipeline = None
 
@@ -108,6 +111,13 @@ class AcademicRiskApp:
         return True, []
 
     def setup_routes(self):
+        @self.app.route('/swagger.yml', methods=['GET'])
+        def swagger_spec():
+            return send_file(self.swagger_path, mimetype='application/yaml')
+
+        @self.app.route('/docs', methods=['GET'])
+        def swagger_ui():
+            return send_file(self.swagger_ui_path, mimetype='text/html')
 
         @self.app.route('/metrics', methods=['GET'])
         def prometheus_metrics():
@@ -217,8 +227,19 @@ class AcademicRiskApp:
         def train_endpoint():
             body = request.get_json(silent=True) or {}
             data_path = body.get('data_path', 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv')
+            params_payload = body.get('training_params', {})
+            training_config, validation_errors = parse_training_params(params_payload)
+
+            if validation_errors:
+                TRAINING_REQUESTS.labels(status="error").inc()
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Invalid training parameters',
+                    'errors': validation_errors
+                }), 400
+
             start = time.perf_counter()
-            result = self.train(data_path)
+            result = self.train(data_path, training_config)
             elapsed = time.perf_counter() - start
             response, status_code = result
             if status_code == 200:
@@ -265,14 +286,19 @@ class AcademicRiskApp:
                 return jsonify({'status': 'error', 'message': str(e)}), 500
 
     @staticmethod
-    def train(data_path: str = 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv'):
+    def train(
+        data_path: str = 'data/raw/PEDE_PASSOS_DATASET_FIAP.csv',
+        training_config: dict | None = None
+    ):
         try:
-            trainer = ModelTrainer()
+            trainer = ModelTrainer(config=training_config or DEFAULT_TRAINING_CONFIG.copy())
             best_model_name, best_score = trainer.train_and_evaluate(data_path)
             return jsonify({
                 'status': 'success',
                 'best_model': best_model_name,
                 'recall_score': best_score,
+                'experiment_name': trainer.experiment_name,
+                'training_config': trainer.config,
                 'message': 'Training completed successfully'
             }), 200
         except Exception as e:

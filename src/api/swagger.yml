@@ -1,0 +1,241 @@
+openapi: 3.0.3
+info:
+  title: Academic Risk Model API
+  version: 1.0.0
+  description: API for prediction, training, and monitoring of academic risk models.
+servers:
+  - description: Local server
+    url: http://localhost:5000
+  - description: EC2 server
+    url: http://PUBLIC_IP:5000
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Service health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /predict:
+    post:
+      summary: Predict student academic risk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/PredictRecord"
+                - type: array
+                  items:
+                    $ref: "#/components/schemas/PredictRecord"
+      responses:
+        "200":
+          description: Prediction completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictResponse"
+        "400":
+          description: Invalid payload
+        "503":
+          description: Model unavailable
+  /train:
+    post:
+      summary: Train and select the best model
+      description: Trigger training with optional custom parameters.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainRequest"
+      responses:
+        "200":
+          description: Training completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainResponse"
+        "400":
+          description: Invalid training parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /pipeline/run:
+    post:
+      summary: Run preprocessing pipeline
+      responses:
+        "200":
+          description: Pipeline executed
+        "500":
+          description: Pipeline execution failed
+  /monitoring/drift:
+    post:
+      summary: Run data drift detection
+      responses:
+        "200":
+          description: Drift check result
+        "404":
+          description: Data source not found
+        "500":
+          description: Drift check failed
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        "200":
+          description: Metrics payload
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+        message:
+          type: string
+          example: Academic Risk API is running
+    PredictRecord:
+      type: object
+      required:
+        - INDE
+        - IAA
+        - IEG
+        - IPS
+        - IDA
+        - IPP
+        - IPV
+        - IAN
+        - DEFASAGEM
+        - IDADE_ALUNO
+        - ANOS_PM
+        - PEDRA
+        - PONTO_VIRADA
+        - SINALIZADOR_INGRESSANTE
+      properties:
+        INDE:
+          type: number
+        IAA:
+          type: number
+        IEG:
+          type: number
+        IPS:
+          type: number
+        IDA:
+          type: number
+        IPP:
+          type: number
+        IPV:
+          type: number
+        IAN:
+          type: number
+        DEFASAGEM:
+          type: integer
+        IDADE_ALUNO:
+          type: integer
+        ANOS_PM:
+          type: integer
+        PEDRA:
+          type: string
+        PONTO_VIRADA:
+          type: string
+        SINALIZADOR_INGRESSANTE:
+          type: string
+    PredictResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        count:
+          type: integer
+          example: 1
+        predictions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              risk_prediction:
+                type: integer
+                enum: [0, 1]
+              risk_probability:
+                type: number
+                nullable: true
+              risk_label:
+                type: string
+    TrainRequest:
+      type: object
+      properties:
+        data_path:
+          type: string
+          default: data/raw/PEDE_PASSOS_DATASET_FIAP.csv
+        training_params:
+          type: object
+          properties:
+            test_size:
+              type: number
+              minimum: 0.1
+              maximum: 0.5
+              default: 0.2
+            random_state:
+              type: integer
+              default: 42
+            cv_folds:
+              type: integer
+              minimum: 2
+              maximum: 10
+              default: 5
+            scoring:
+              type: string
+              enum: [recall, roc_auc, f1]
+              default: recall
+            class_weight:
+              type: string
+              nullable: true
+              enum: [balanced]
+            models_to_run:
+              type: array
+              items:
+                type: string
+                enum: [Logistic_Regression, Random_Forest, Gradient_Boosting]
+              minItems: 1
+    TrainResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        best_model:
+          type: string
+          example: Gradient_Boosting
+        recall_score:
+          type: number
+          example: 0.93
+        experiment_name:
+          type: string
+          example: Exp_20260226_1430_Feats14_scoring-recall_cv_folds-5_test_size-0.2_random_state-42_class_weight-balanced_models_to_run-Logistic_Regression+Random_Forest+Gradient_Boosting
+        training_config:
+          type: object
+        message:
+          type: string
+          example: Training completed successfully
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: string

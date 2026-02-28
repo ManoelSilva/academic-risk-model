@@ -111,16 +111,56 @@ The API will be available at `http://localhost:5000`.
 
 ## 📡 API Usage
 
+### Interactive API Documentation (Swagger)
+```http
+GET /docs
+```
+
+OpenAPI specification file:
+```http
+GET /swagger.yml
+```
+
 ### Health Check
 ```http
 GET /health
 ```
 
 ### Train Model
-Triggers the training pipeline on the default dataset.
+Triggers the training pipeline on the default dataset, with optional custom training parameters.
 ```http
 POST /train
 ```
+
+Example with custom parameters:
+```http
+POST /train
+Content-Type: application/json
+
+{
+  "data_path": "data/raw/PEDE_PASSOS_DATASET_FIAP.csv",
+  "training_params": {
+    "test_size": 0.3,
+    "random_state": 77,
+    "cv_folds": 3,
+    "scoring": "roc_auc",
+    "class_weight": "balanced",
+    "models_to_run": ["Logistic_Regression", "Random_Forest"]
+  }
+}
+```
+
+Supported `training_params`:
+- `test_size` (float, range: 0.1 to 0.5)
+- `random_state` (int)
+- `cv_folds` (int, range: 2 to 10)
+- `scoring` (`recall`, `roc_auc`, `f1`)
+- `class_weight` (`balanced` or `null`)
+- `models_to_run` (non-empty list with `Logistic_Regression`, `Random_Forest`, `Gradient_Boosting`)
+
+The training response now includes:
+- `experiment_name`: generated using selected parameter names and values
+- `training_config`: normalized configuration used in training
 
 ### Predict Risk
 Send student data to get a risk assessment.

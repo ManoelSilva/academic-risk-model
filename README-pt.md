@@ -85,16 +85,56 @@ A API estará disponível em `http://localhost:5000`.
 
 ## 📡 Uso da API
 
+### Documentação Interativa da API (Swagger)
+```http
+GET /docs
+```
+
+Arquivo de especificação OpenAPI:
+```http
+GET /swagger.yml
+```
+
 ### Verificação de Saúde (Health Check)
 ```http
 GET /health
 ```
 
 ### Treinar Modelo
-Aciona o pipeline de treinamento no conjunto de dados padrão.
+Aciona o pipeline de treinamento no conjunto de dados padrão, com parâmetros customizáveis opcionais.
 ```http
 POST /train
 ```
+
+Exemplo com parâmetros customizados:
+```http
+POST /train
+Content-Type: application/json
+
+{
+  "data_path": "data/raw/PEDE_PASSOS_DATASET_FIAP.csv",
+  "training_params": {
+    "test_size": 0.3,
+    "random_state": 77,
+    "cv_folds": 3,
+    "scoring": "roc_auc",
+    "class_weight": "balanced",
+    "models_to_run": ["Logistic_Regression", "Random_Forest"]
+  }
+}
+```
+
+Parâmetros suportados em `training_params`:
+- `test_size` (float, intervalo: 0.1 a 0.5)
+- `random_state` (int)
+- `cv_folds` (int, intervalo: 2 a 10)
+- `scoring` (`recall`, `roc_auc`, `f1`)
+- `class_weight` (`balanced` ou `null`)
+- `models_to_run` (lista não vazia com `Logistic_Regression`, `Random_Forest`, `Gradient_Boosting`)
+
+A resposta de treino agora inclui:
+- `experiment_name`: gerado usando nomes e valores dos parâmetros escolhidos
+- `training_config`: configuração normalizada utilizada no treinamento
 
 ### Prever Risco
 Envie dados do aluno para obter uma avaliação de risco.

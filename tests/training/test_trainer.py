@@ -63,7 +63,28 @@ class TestModelTrainerInit:
             trainer = ModelTrainer()
         assert hasattr(trainer, 'experiment_name')
         assert 'Exp_' in trainer.experiment_name
-        assert 'CV5' in trainer.experiment_name or 'CV' in trainer.experiment_name
+        assert 'cv_folds-5' in trainer.experiment_name
+        assert 'scoring-recall' in trainer.experiment_name
+
+    def test_experiment_name_reflects_custom_params(self):
+        """Test experiment name includes custom parameter names and values."""
+        custom_config = {
+            'test_size': 0.3,
+            'random_state': 99,
+            'cv_folds': 3,
+            'scoring': 'roc_auc',
+            'class_weight': 'balanced',
+            'models_to_run': ['Logistic_Regression']
+        }
+        with patch('src.training.trainer.mlflow.set_tracking_uri'), \
+                patch('src.training.trainer.mlflow.set_experiment'):
+            trainer = ModelTrainer(config=custom_config)
+
+        assert 'test_size-0.3' in trainer.experiment_name
+        assert 'random_state-99' in trainer.experiment_name
+        assert 'cv_folds-3' in trainer.experiment_name
+        assert 'scoring-roc_auc' in trainer.experiment_name
+        assert 'models_to_run-Logistic_Regression' in trainer.experiment_name
 
 
 class TestPrepareData:
