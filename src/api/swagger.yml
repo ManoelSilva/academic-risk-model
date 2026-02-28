@@ -4,7 +4,10 @@ info:
   version: 1.0.0
   description: API for prediction, training, and monitoring of academic risk models.
 servers:
-  - url: http://localhost:5000
+  - description: Local server
+    url: http://localhost:5000
+  - description: EC2 server
+    url: http://PUBLIC_IP:5000
 paths:
   /health:
     get:
