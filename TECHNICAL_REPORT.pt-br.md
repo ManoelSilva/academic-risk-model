@@ -594,18 +594,18 @@ O projeto inclui uma suíte de testes abrangente (72 testes, 100% de aprovação
 
 O sistema atende ou supera todos os KPIs definidos:
 
-| KPI | Meta | Alcançado | Status |
-|-----|------|-----------|--------|
-| Recall | ≥ 90% | 95,0% | **APROVADO** |
-| F1 Score | ≥ 70% | 82,9% | **APROVADO** |
-| ROC-AUC | ≥ 70% | 74,6% | **APROVADO** |
-| Estabilidade CV (std) | ≤ 5% | 3,0% | **APROVADO** |
-| Suíte de Testes | 100% aprovação | 72/72 | **APROVADO** |
-| Containerizado | Sim | Docker + Compose | **APROVADO** |
-| IaC | Sim | Terraform (AWS) | **APROVADO** |
-| CI/CD | Automatizado | GitHub Actions | **APROVADO** |
-| Monitoramento | Implementado | Prometheus + Evidently | **APROVADO** |
-| Documentação da API | Disponível | Swagger UI + OpenAPI | **APROVADO** |
+| KPI | Meta | Alcançado |
+|-----|------|-----------|
+| Recall | ≥ 90% | 95,0% |
+| F1 Score | ≥ 70% | 82,9% |
+| ROC-AUC | ≥ 70% | 74,6% |
+| Estabilidade CV (std) | ≤ 5% | 3,0% |
+| Suíte de Testes | 100% aprovação | 72/72 |
+| Containerizado | Sim | Docker + Compose |
+| IaC | Sim | Terraform (AWS) |
+| CI/CD | Automatizado | GitHub Actions |
+| Monitoramento | Implementado | Prometheus + Evidently |
+| Documentação da API | Disponível | Swagger UI + OpenAPI |
 
 ### 9.2 Condições Necessárias para Deploy Seguro
 

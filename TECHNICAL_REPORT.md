@@ -593,18 +593,18 @@ The project includes a comprehensive test suite (72 tests, 100% pass rate):
 
 The system meets or exceeds all defined KPIs:
 
-| KPI | Target | Achieved | Status |
-|-----|--------|----------|--------|
-| Recall | ≥ 90% | 95.0% | **PASS** |
-| F1 Score | ≥ 70% | 82.9% | **PASS** |
-| ROC-AUC | ≥ 70% | 74.6% | **PASS** |
-| CV Stability (std) | ≤ 5% | 3.0% | **PASS** |
-| Test Suite | 100% pass | 72/72 | **PASS** |
-| Containerized | Yes | Docker + Compose | **PASS** |
-| IaC | Yes | Terraform (AWS) | **PASS** |
-| CI/CD | Automated | GitHub Actions | **PASS** |
-| Monitoring | Implemented | Prometheus + Evidently | **PASS** |
-| API Documentation | Available | Swagger UI + OpenAPI | **PASS** |
+| KPI | Target | Achieved |
+|-----|--------|----------|
+| Recall | ≥ 90% | 95.0% |
+| F1 Score | ≥ 70% | 82.9% |
+| ROC-AUC | ≥ 70% | 74.6% |
+| CV Stability (std) | ≤ 5% | 3.0% |
+| Test Suite | 100% pass | 72/72 |
+| Containerized | Yes | Docker + Compose |
+| IaC | Yes | Terraform (AWS) |
+| CI/CD | Automated | GitHub Actions |
+| Monitoring | Implemented | Prometheus + Evidently |
+| API Documentation | Available | Swagger UI + OpenAPI |
 
 ### 9.2 Conditions Required for Safe Deployment
 
